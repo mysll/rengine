@@ -3,7 +3,7 @@ use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
 use tracing::{error, info};
 
-use crate::{core::Core, tokio_util::run_local, options::{Options, load_option, with_port}};
+use crate::{core::Core, tokio_util::run_local, options::{Options, load_option}};
 
 pub struct Runtime {}
 
