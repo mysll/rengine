@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
 use tokio::{
-    io::{AsyncBufReadExt, BufReader},
+    io::{AsyncBufReadExt, BufReader,AsyncWriteExt},
     net::{tcp::ReadHalf, TcpStream},
     select,
     sync::mpsc,
@@ -33,7 +33,7 @@ impl Connection {
     }
 
     pub async fn io_loop(&mut self) {
-        let (read_stream, _) = self.conn.split();
+        let (read_stream, mut write_stream) = self.conn.split();
         let mut read_stream: BufReader<ReadHalf> = BufReader::new(read_stream);
         info!("new client {}", self.addr);
         while !self.shutdown.is_shutdown() {
@@ -52,6 +52,7 @@ impl Connection {
                 } => {
                     if let Ok(data) = res {
                         info!(data);
+                        _ = write_stream.write_all(data.as_bytes()).await;
                         continue;
                     }
                     break;

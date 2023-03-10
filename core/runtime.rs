@@ -3,7 +3,11 @@ use std::future::Future;
 use tokio::sync::{broadcast, mpsc};
 use tracing::{error, info};
 
-use crate::{core::Core, tokio_util::run_local, options::{Options, load_option}};
+use crate::{
+    core::Core,
+    options::{load_option, Options},
+    tokio_util::run_local,
+};
 
 pub struct Runtime {}
 
@@ -15,7 +19,6 @@ impl Runtime {
 }
 
 pub async fn core_run(port: i32, shutdown: impl Future) -> crate::Result<()> {
-    
     let (notify_shutdown, _) = broadcast::channel(1);
     let (shutdown_complete_tx, shutdown_complete_rx) = mpsc::channel(1);
 
@@ -54,7 +57,7 @@ pub async fn core_run(port: i32, shutdown: impl Future) -> crate::Result<()> {
     Ok(())
 }
 
-pub fn run(options:&[impl Fn(&mut Options)], shutdown: impl Future) {
+pub fn run(options: &[impl Fn(&mut Options)], shutdown: impl Future) {
     let options = load_option(options);
     run_local(async {
         _ = core_run(options.port, shutdown).await;

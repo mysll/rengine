@@ -6,8 +6,8 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Flags {
-   #[arg(short, long, default_value_t=7777)]
-   port: i32,
+    #[arg(short, long, default_value_t = 7777)]
+    port: i32,
 }
 
 fn main() {
