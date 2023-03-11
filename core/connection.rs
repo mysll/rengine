@@ -1,17 +1,15 @@
 use std::net::SocketAddr;
 
-use tokio::{
-    io::{AsyncBufReadExt, BufReader,AsyncWriteExt},
-    net::{tcp::ReadHalf, TcpStream},
-    select,
-    sync::mpsc,
-};
+use tokio::{net::TcpStream, select, sync::mpsc};
 use tracing::info;
 
-use crate::shutdown::Shutdown;
+use crate::{
+    package::{Message, Package},
+    shutdown::Shutdown,
+};
 
 pub struct Connection {
-    conn: TcpStream,
+    stream: Package,
     addr: SocketAddr,
     shutdown: Shutdown,
     _shutdown_complete: mpsc::Sender<()>,
@@ -25,40 +23,44 @@ impl Connection {
         shutdown_complete: mpsc::Sender<()>,
     ) -> Self {
         Self {
-            conn: conn,
+            stream: Package::new(conn),
             addr: addr,
             shutdown: shutdown,
             _shutdown_complete: shutdown_complete,
         }
     }
 
-    pub async fn io_loop(&mut self) {
-        let (read_stream, mut write_stream) = self.conn.split();
-        let mut read_stream: BufReader<ReadHalf> = BufReader::new(read_stream);
+    pub async fn io_loop(&mut self) -> crate::Result<()> {
         info!("new client {}", self.addr);
         while !self.shutdown.is_shutdown() {
-            select! {
-                res = async {
-                    let mut data = String::new();
-                    let res = read_stream.read_line(&mut data).await;
-                    if let Ok(number) =  res {
-                        if number == 0 || data == "quit\r\n" {
-                            return Err(())
-                        }
-                        Ok(data)
-                    } else {
-                        Err(())
-                    }
-                } => {
-                    if let Ok(data) = res {
-                        info!(data);
-                        _ = write_stream.write_all(data.as_bytes()).await;
-                        continue;
-                    }
-                    break;
+            let maybe_package = select! {
+                 res = self.stream.read_message() => res?,
+                _ = self.shutdown.recv() => {
+                    return Ok(());
                 }
-                _ = self.shutdown.recv() => {}
             };
+
+            let message = match maybe_package {
+                Some(message) => message,
+                None => {
+                    return Ok(());
+                }
+            };
+            let body = match message.body {
+                Some(body) => body,
+                None => return Ok(()),
+            };
+
+            info!(
+                "new message {}, size {}, body {}",
+                message.msgcode,
+                body.len(),
+                String::from_utf8(body.to_vec())?
+            );
+
+            self.stream.write_message(Message::new(2, body)).await?;
         }
+
+        Ok(())
     }
 }

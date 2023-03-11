@@ -12,3 +12,4 @@ path = "lib.rs"
 tokio.workspace = true
 re_utils.workspace = true
 tracing.workspace = true
+bytes.workspace = true
