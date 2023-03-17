@@ -23,6 +23,8 @@ pub fn def_entity(args: TokenStream, input: TokenStream) -> TokenStream {
             quote! {__saves: Vec<&'static str>},
             quote! {__reps: Vec<&'static str>},
             quote! {__index: std::collections::HashMap<&'static str,u32>},
+            quote! {__dirty: bool},
+            quote! {__modify_attrs: Vec<u32>},
         ];
         for att in add_attr {
             fields
