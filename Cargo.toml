@@ -1,5 +1,5 @@
 [workspace]
-members = ["utils", "tools", "core", "launch"]
+members = ["utils", "tools", "core", "launch", "entity", "ops"]
 
 [workspace.package]
 authors = ["the rengine authors"]
@@ -8,8 +8,10 @@ license = "MIT"
 repository = "https://github.com/mysll/rengine"
 
 [workspace.dependencies]
+re_ops = { path = "./ops" }
 re_core = { path = "./core" }
 re_utils = { path = "./utils" }
+re_entity = {path = "./entity"}
 rand = "0.8.5"
 tokio = { version = "=1.25.0", features = ["full"] }
 tokio-util = "0.7.7"
@@ -18,3 +20,7 @@ tracing-futures = { version = "0.2.3" }
 tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }
 clap = { version = "4.1.8", features = ["derive"] }
 bytes = "1.4.0"
+syn = { version = "1.0.109", features = ["full", "extra-traits"] }
+bae = "0.1.7"
+proc-macro2 = "1.0.52"
+quote = "1.0.25"

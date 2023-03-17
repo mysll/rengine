@@ -1,10 +1,11 @@
-
 use bytes::{Bytes, BytesMut};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt, BufWriter},
     net::TcpStream,
 };
 use tracing::info;
+
+use crate::MAX_LEN;
 
 pub struct Message {
     pub msgcode: i32,
@@ -37,7 +38,7 @@ impl Package {
     pub fn new(socket: TcpStream) -> Self {
         Self {
             stream: BufWriter::new(socket),
-            buffer: BytesMut::with_capacity(64 * 1024),
+            buffer: BytesMut::with_capacity(MAX_LEN),
         }
     }
 
@@ -72,6 +73,9 @@ impl Package {
         let msgcode = messgae.msgcode;
         if let Some(mut body) = messgae.body.take() {
             size += body.len();
+            if size + 4 >= MAX_LEN {
+                return Err("message size exceed".into());
+            }
             self.stream.write_i32_le(size.try_into().unwrap()).await?;
             self.stream.write_i32_le(msgcode).await?;
             self.stream.write_buf(&mut body).await?;
@@ -80,7 +84,7 @@ impl Package {
             self.stream.write_i32_le(msgcode).await?;
         }
         self.stream.flush().await?;
-        info!("send message {} len {}", msgcode, size);
+        info!("send message code {} len {}", msgcode, size);
         Ok(())
     }
 }

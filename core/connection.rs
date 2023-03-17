@@ -52,7 +52,7 @@ impl Connection {
             };
 
             info!(
-                "new message {}, size {}, body {}",
+                "new message, code {}, size {}, body {}",
                 message.msgcode,
                 body.len(),
                 String::from_utf8(body.to_vec())?
