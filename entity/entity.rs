@@ -93,12 +93,13 @@ impl EntityInfo {
     pub fn clear_modify(&mut self) {
         self.modify_attrs.clear();
     }
-    pub fn change_attr(&mut self, index: u32) {
+    pub fn change_attr(&mut self, index: u32, old: &dyn Any) {
         if self.saves_set.contains(&index) {
             self.dirty = true;
         }
         if self.reps_set.contains(&index) {
             self.modify_attrs.push(index);
         }
+        print!("old:{:?}\n", old);
     }
 }

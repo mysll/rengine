@@ -32,8 +32,8 @@ pub fn parse_token(
                         if self.#ident_field == val {
                             return;
                         }
-                        self.#ident_field = val;
-                        self.__internal.change_attr(#index);
+                        let old = std::mem::replace(&mut self.#ident_field, val);
+                        self.__internal.change_attr(#index, &old);
                     }
                     pub fn #set_any(&mut self, val:&dyn std::any::Any) -> bool {
                         match val.downcast_ref::<#ty>() {

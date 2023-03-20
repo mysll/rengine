@@ -22,10 +22,14 @@ mod tests {
 
     #[def_entity]
     struct Player {
-        #[attr(save = true)]
+        #[attr(save)]
         name: String,
-        #[attr(replicated = true)]
+        #[attr(replicated)]
         age: i32,
+        #[attr(save, replicated)]
+        hp: i32,
+        #[attr(save, replicated)]
+        mp: i32,
     }
 
     #[test]
@@ -44,8 +48,12 @@ mod tests {
         println!("{:?}", p.modify());
         p.clear_dirty();
         p.set_attr_by_index(2, &30i32);
+        p.set_attr_by_name("hp", &100i32);
+        p.set_mp(100);
         println!("{:?}", p.dirty());
         println!("{:?}", p.modify());
         println!("{:?}", p.get_modify());
+        println!("{:?}", p.get_name());
+        println!("{:?}", p.get_hp());
     }
 }

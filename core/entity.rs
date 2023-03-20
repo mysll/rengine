@@ -3,8 +3,8 @@ use re_ops::def_entity;
 #[def_entity]
 struct Player {
     hp:i32,
-    #[attr(save = true)]
+    #[attr(save, replicated)]
     name: String,
-    #[attr(replicated = true)]
+    #[attr(replicated)]
     age: i32,
 }

@@ -18,7 +18,7 @@ impl Runtime {
     }
 }
 
-pub async fn core_run(port: i32, shutdown: impl Future) -> crate::Result<()> {
+pub async fn core_run(port: i32, shutdown: impl Future) {
     let (notify_shutdown, _) = broadcast::channel(1);
     let (shutdown_complete_tx, shutdown_complete_rx) = mpsc::channel(1);
 
@@ -53,13 +53,12 @@ pub async fn core_run(port: i32, shutdown: impl Future) -> crate::Result<()> {
 
     drop(shutdown_complete_tx);
 
-    let _ = shutdown_complete_rx.recv().await;
-    Ok(())
+    shutdown_complete_rx.recv().await;
 }
 
 pub fn run(options: &[impl Fn(&mut Options)], shutdown: impl Future) {
     let options = load_option(options);
     run_local(async {
-        _ = core_run(options.port, shutdown).await;
+        core_run(options.port, shutdown).await;
     });
 }
