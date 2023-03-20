@@ -1,6 +1,14 @@
-use std::any::Any;
+use std::{
+    any::Any,
+    collections::{HashMap, HashSet},
+};
 
 pub trait Object {
+    fn dirty(&self) -> bool;
+    fn clear_dirty(&mut self);
+    fn modify(&self) -> bool;
+    fn clear_modify(&mut self);
+    fn get_modify<'a>(&'a self) -> &'a Vec<u32>;
     fn get_attrs<'a>(&'a self) -> &'a Vec<&str>;
     fn save_attrs<'a>(&'a self) -> &'a Vec<&str>;
     fn rep_attrs<'a>(&'a self) -> &'a Vec<&str>;
@@ -19,11 +27,13 @@ pub trait Object {
 #[derive(Default)]
 pub struct EntityInfo {
     pub attrs: Vec<&'static str>,
-    pub index: std::collections::HashMap<&'static str, u32>,
+    pub index: HashMap<&'static str, u32>,
     pub saves_index: Vec<u32>,
     pub reps_index: Vec<u32>,
     pub saves: Vec<&'static str>,
     pub reps: Vec<&'static str>,
+    pub saves_set: HashSet<u32>,
+    pub reps_set: HashSet<u32>,
     pub dirty: bool,
     pub modify_attrs: Vec<u32>,
 }
@@ -41,14 +51,16 @@ impl EntityInfo {
         self.attrs.iter().enumerate().for_each(|(i, attr)| {
             self.index.insert(attr, i as u32);
         });
-        self.saves
-            .iter()
-            .enumerate()
-            .for_each(|(_, attr)| self.saves_index.push(self.index[attr]));
-        self.reps
-            .iter()
-            .enumerate()
-            .for_each(|(_, attr)| self.reps_index.push(self.index[attr]));
+        self.saves.iter().enumerate().for_each(|(_, &attr)| {
+            let index = self.index[attr];
+            self.saves_index.push(index);
+            self.saves_set.insert(index);
+        });
+        self.reps.iter().enumerate().for_each(|(_, &attr)| {
+            let index = self.index[attr];
+            self.reps_index.push(index);
+            self.reps_set.insert(index);
+        });
     }
 
     pub fn attr_count(&self) -> u32 {
@@ -80,5 +92,13 @@ impl EntityInfo {
     }
     pub fn clear_modify(&mut self) {
         self.modify_attrs.clear();
+    }
+    pub fn change_attr(&mut self, index: u32) {
+        if self.saves_set.contains(&index) {
+            self.dirty = true;
+        }
+        if self.reps_set.contains(&index) {
+            self.modify_attrs.push(index);
+        }
     }
 }

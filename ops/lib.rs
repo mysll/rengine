@@ -14,6 +14,13 @@ pub fn def_entity(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut item_struct = parse_macro_input!(input as ItemStruct);
     let _ = parse_macro_input!(args as parse::Nothing);
     if let syn::Fields::Named(ref mut fields) = item_struct.fields {
+        // 插入一个占位属性
+        fields.named.insert(
+            0,
+            syn::Field::parse_named
+                .parse2(quote! {#[attr()]none: ()})
+                .unwrap(),
+        );
         let add_attr = vec![quote! {pub __internal: re_entity::entity::EntityInfo}];
         for att in add_attr {
             fields
@@ -57,17 +64,15 @@ pub fn num_enum_builder(input: TokenStream) -> TokenStream {
 pub fn entity_builder(input: TokenStream) -> TokenStream {
     let ast: DeriveInput = parse_macro_input!(input);
     let mut attrs: Vec<Ident> = Vec::new();
-    let mut attrs_up: Vec<Ident> = Vec::new();
     let mut fn_attrs: Vec<proc_macro2::TokenStream> = Vec::new();
     let mut save_attrs: Vec<Ident> = Vec::new();
     let mut rep_attrs: Vec<Ident> = Vec::new();
     let mut match_any_set: Vec<proc_macro2::TokenStream> = Vec::new();
     let mut match_any_get: Vec<proc_macro2::TokenStream> = Vec::new();
 
-    let (ident, ident_enum) = object::parse_token(
+    let ident = object::parse_token(
         ast,
         &mut attrs,
-        &mut attrs_up,
         &mut fn_attrs,
         &mut save_attrs,
         &mut rep_attrs,
@@ -75,16 +80,8 @@ pub fn entity_builder(input: TokenStream) -> TokenStream {
         &mut match_any_get,
     );
 
-    let enum_token = quote! {
-        #[derive(re_ops::NumEnum)]
-        pub enum #ident_enum {
-            #(#attrs_up),*
-        }
-    };
-
     let entity_token = object::make_entity(
         &ident,
-        &ident_enum,
         &attrs,
         &fn_attrs,
         &save_attrs,
@@ -92,10 +89,9 @@ pub fn entity_builder(input: TokenStream) -> TokenStream {
         &match_any_set,
         &match_any_get,
     );
-    let object_token = object::make_object(&ident, &ident_enum);
+    let object_token = object::make_object(&ident);
 
     let output = quote! {
-        #enum_token
         #entity_token
         #object_token
     };

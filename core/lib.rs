@@ -18,8 +18,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[cfg(test)]
 mod tests {
 
-    use std::collections::HashMap;
-
     use re_ops::def_entity;
 
     #[def_entity]
@@ -42,19 +40,12 @@ mod tests {
         println!("{:?}", p.save_attrs_index());
         println!("{:?}", p.rep_attrs());
         println!("{:?}", p.rep_attrs_index());
-    }
-
-    #[test]
-    fn test2() {
-        let v: Vec<&str> = vec!["hello", "world"];
-        let mut v1: HashMap<&str, u32> = HashMap::new();
-        v.iter().enumerate().for_each(|(i, e)| {
-            v1.insert(e, i as u32);
-        });
-
-        let mut v2: Vec<u32> = Vec::new();
-
-        v.iter().enumerate().for_each(|(_, attr)| v2.push(v1[attr]));
-        println!("{:?}", v2);
+        println!("{:?}", p.dirty());
+        println!("{:?}", p.modify());
+        p.clear_dirty();
+        p.set_attr_by_index(2, &30i32);
+        println!("{:?}", p.dirty());
+        println!("{:?}", p.modify());
+        println!("{:?}", p.get_modify());
     }
 }
