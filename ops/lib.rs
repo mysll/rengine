@@ -2,8 +2,8 @@ mod attributes;
 mod object;
 
 use proc_macro::TokenStream;
-use proc_macro2::{Ident, Span};
-use quote::{format_ident, quote};
+use proc_macro2::Ident;
+use quote::quote;
 use syn::{
     parse::{self, Parser},
     parse_macro_input, DeriveInput, ItemStruct,
