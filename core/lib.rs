@@ -18,10 +18,11 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[cfg(test)]
 mod tests {
 
+    use re_entity::entity::Registry;
     use re_ops::def_entity;
 
     #[def_entity]
-    struct Player {
+    struct TestPlayer {
         #[attr(save)]
         name: String,
         #[attr(replicated)]
@@ -34,7 +35,9 @@ mod tests {
 
     #[test]
     fn test() {
-        let mut p = Player::new();
+        let r = Registry::init();
+        let mut player = r.create::<TestPlayer>("TestPlayer").unwrap();
+        let p = player.as_mut();
         p.set_name("hello".to_string());
         println!("{:?}", p.get_attrs());
         println!("{:?}", p.get_attr_by_name("name").unwrap());

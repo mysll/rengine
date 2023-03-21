@@ -1,9 +1,10 @@
 use std::{
     any::Any,
     collections::{HashMap, HashSet},
+    fmt::Debug,
 };
 
-pub trait Object {
+pub trait Object: Debug + Any {
     fn dirty(&self) -> bool;
     fn clear_dirty(&mut self);
     fn modify(&self) -> bool;
@@ -24,7 +25,7 @@ pub trait Object {
 }
 
 #[allow(dead_code)]
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct EntityInfo {
     pub attrs: Vec<&'static str>,
     pub index: HashMap<&'static str, u32>,
@@ -101,5 +102,59 @@ impl EntityInfo {
             self.modify_attrs.push(index);
         }
         print!("old:{:?}\n", old);
+    }
+}
+
+#[allow(dead_code)]
+pub struct ObjectInitializer {
+    pub name: &'static str,
+    pub f: fn() -> Box<dyn Object>,
+}
+
+impl ObjectInitializer {
+    pub const fn register_entity(name: &'static str, f: fn() -> Box<dyn Object>) -> Self {
+        Self { name, f }
+    }
+}
+
+inventory::collect!(ObjectInitializer);
+
+pub struct Registry {
+    pub entity_map: HashMap<&'static str, fn() -> Box<dyn Object>>,
+}
+
+impl Registry {
+    pub fn init() -> Self {
+        let mut map: HashMap<&'static str, fn() -> Box<dyn Object>> = HashMap::new();
+        for initializer in inventory::iter::<ObjectInitializer> {
+            if map.contains_key(initializer.name) {
+                panic!("entity {} duplicate", initializer.name);
+            }
+            map.insert(initializer.name, initializer.f);
+        }
+        Self { entity_map: map }
+    }
+
+    pub fn create_object(&self, entity: &str) -> Option<Box<dyn Object>> {
+        match self.entity_map.get(entity) {
+            Some(&f) => Some(f()),
+            None => None,
+        }
+    }
+
+    pub fn create_any(&self, entity: &str) -> Option<Box<dyn Any>> {
+        match self.entity_map.get(entity) {
+            Some(&f) => Some(f()),
+            None => None,
+        }
+    }
+
+    pub fn create<T: Object + Any>(&self, entity: &str) -> Option<Box<T>> {
+        if let Some(any_object) = self.create_any(entity) {
+            if let Ok(entity) = any_object.downcast::<T>() {
+                return Some(entity);
+            }
+        }
+        None
     }
 }

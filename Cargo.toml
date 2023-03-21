@@ -24,3 +24,4 @@ syn = { version = "1.0.109", features = ["full", "extra-traits"] }
 bae = "0.1.7"
 proc-macro2 = "1.0.52"
 quote = "1.0.25"
+inventory = "0.3.4"

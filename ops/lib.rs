@@ -2,8 +2,8 @@ mod attributes;
 mod object;
 
 use proc_macro::TokenStream;
-use proc_macro2::Ident;
-use quote::quote;
+use proc_macro2::{Ident, Span};
+use quote::{format_ident, quote};
 use syn::{
     parse::{self, Parser},
     parse_macro_input, DeriveInput, ItemStruct,
@@ -21,7 +21,7 @@ pub fn def_entity(args: TokenStream, input: TokenStream) -> TokenStream {
                 .parse2(quote! {#[attr()]none: ()})
                 .unwrap(),
         );
-        let add_attr = vec![quote! {pub __internal: re_entity::entity::EntityInfo}];
+        let add_attr = vec![quote! {__internal: re_entity::entity::EntityInfo}];
         for att in add_attr {
             fields
                 .named
@@ -29,7 +29,7 @@ pub fn def_entity(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     }
     return quote! {
-        #[derive(Default, re_ops::Entity)]
+        #[derive(Default, Debug, re_ops::Entity)]
         #[allow(dead_code)]
         #item_struct
     }
@@ -94,6 +94,9 @@ pub fn entity_builder(input: TokenStream) -> TokenStream {
     let output = quote! {
         #entity_token
         #object_token
+        inventory::submit! {
+            re_entity::entity::ObjectInitializer::register_entity(stringify!(#ident), || Box::new(#ident::new()))
+        }
     };
     output.into()
 }

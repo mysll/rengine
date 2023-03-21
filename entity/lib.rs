@@ -1,5 +1,6 @@
-pub mod entity;
+#![feature(trait_upcasting)]
 
+pub mod entity;
 
 #[cfg(test)]
 mod tests {
