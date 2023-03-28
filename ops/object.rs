@@ -112,6 +112,12 @@ pub fn make_object(ident: &Ident) -> TokenStream {
     quote! {
         use re_entity::entity::Object;
         impl Object for #ident {
+            fn uid(&self) -> u64 {
+                self.__internal.uid
+            }
+            fn get_class_type(&self) -> re_entity::entity::ClassType {
+                self.__internal.class_type
+            }
             fn dirty(&self) -> bool {
                 self.__internal.dirty()
             }

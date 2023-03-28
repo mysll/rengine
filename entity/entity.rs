@@ -2,9 +2,23 @@ use std::{
     any::Any,
     collections::{HashMap, HashSet},
     fmt::Debug,
+    rc::Rc,
 };
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+pub enum ClassType {
+    #[default]
+    None,
+    Scene,
+    Role,
+    Npc,
+    Item,
+    Aide,
+    Container,
+}
 
 pub trait Object: Debug + Any {
+    fn uid(&self) -> u64;
+    fn get_class_type(&self) -> ClassType;
     fn dirty(&self) -> bool;
     fn clear_dirty(&mut self);
     fn modify(&self) -> bool;
@@ -27,6 +41,8 @@ pub trait Object: Debug + Any {
 #[allow(dead_code)]
 #[derive(Default, Debug)]
 pub struct EntityInfo {
+    pub uid: u64,
+    pub class_type: ClassType,
     pub attrs: Vec<&'static str>,
     pub index: HashMap<&'static str, u32>,
     pub saves_index: Vec<u32>,
@@ -37,6 +53,11 @@ pub struct EntityInfo {
     pub reps_set: HashSet<u32>,
     pub dirty: bool,
     pub modify_attrs: Vec<u32>,
+    pub childs: Vec<Option<Rc<dyn Object>>>,
+    pub cap: usize,
+    pub container_pos: usize,
+    pub child_num: usize,
+    pub parent: Option<Rc<dyn Object>>,
 }
 
 impl EntityInfo {
