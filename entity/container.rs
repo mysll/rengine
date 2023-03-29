@@ -77,10 +77,10 @@ impl Container for EntityInfo {
         for i in 0..self.childs.len() {
             if let Some(obj) = self.childs.get(i).unwrap() {
                 match class_type {
-                    ClassType::None => result.push(obj.uid()),
+                    ClassType::None => result.push(obj.entity_ref().uid()),
                     _ => {
-                        if obj.get_class_type() == class_type {
-                            result.push(obj.uid());
+                        if obj.entity_ref().get_class_type() == class_type {
+                            result.push(obj.entity_ref().uid());
                         }
                     }
                 }
@@ -88,5 +88,4 @@ impl Container for EntityInfo {
         }
         result
     }
-    
 }

@@ -4,6 +4,8 @@ use std::{
     fmt::Debug,
     rc::Rc,
 };
+
+use crate::{container::Container, ObjectPtr};
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub enum ClassType {
     #[default]
@@ -17,8 +19,20 @@ pub enum ClassType {
 }
 
 pub trait Object: Debug + Any {
+    fn entity_ref<'a>(&'a self) -> &'a dyn Entity;
+    fn entity_mut<'a>(&'a mut self) -> &'a mut dyn Entity;
+    fn get_attr_by_name<'a>(&'a self, attr: &str) -> Option<&'a dyn Any>;
+    fn set_attr_by_name(&mut self, attr: &str, val: &dyn Any) -> bool;
+    fn get_attr_by_index<'a>(&'a self, index: u32) -> Option<&'a dyn Any>;
+    fn set_attr_by_index(&mut self, index: u32, val: &dyn Any) -> bool;
+}
+
+pub trait Entity: Container {
     fn uid(&self) -> u64;
+    fn set_uid(&mut self, uid: u64);
     fn get_class_type(&self) -> ClassType;
+    fn is_deleted(&self) -> bool;
+    fn delete(&mut self);
     fn dirty(&self) -> bool;
     fn clear_dirty(&mut self);
     fn modify(&self) -> bool;
@@ -30,12 +44,9 @@ pub trait Object: Debug + Any {
     fn save_attrs_index(&self) -> &Vec<u32>;
     fn rep_attrs_index(&self) -> &Vec<u32>;
     fn get_attr_count(&self) -> u32;
-    fn get_attr_by_name<'a>(&'a self, attr: &str) -> Option<&'a dyn Any>;
-    fn set_attr_by_name(&mut self, attr: &str, val: &dyn Any) -> bool;
     fn get_attr_name<'a>(&'a self, index: u32) -> Option<&'a str>;
     fn get_attr_index(&self, attr: &str) -> Option<u32>;
-    fn get_attr_by_index<'a>(&'a self, index: u32) -> Option<&'a dyn Any>;
-    fn set_attr_by_index(&mut self, index: u32, val: &dyn Any) -> bool;
+    fn change_attr(&mut self, index: u32, old: &dyn Any);
 }
 
 #[allow(dead_code)]
@@ -43,6 +54,7 @@ pub trait Object: Debug + Any {
 pub struct EntityInfo {
     pub uid: u64,
     pub class_type: ClassType,
+    pub delete: bool,
     pub attrs: Vec<&'static str>,
     pub index: HashMap<&'static str, u32>,
     pub saves_index: Vec<u32>,
@@ -60,6 +72,11 @@ pub struct EntityInfo {
     pub parent: Option<Rc<dyn Object>>,
 }
 
+impl Drop for EntityInfo {
+    fn drop(&mut self) {
+        println!("drop entity");
+    }
+}
 impl EntityInfo {
     pub fn init(
         &mut self,
@@ -84,38 +101,70 @@ impl EntityInfo {
             self.reps_set.insert(index);
         });
     }
+}
 
-    pub fn attr_count(&self) -> u32 {
+impl Entity for EntityInfo {
+    fn uid(&self) -> u64 {
+        self.uid
+    }
+    fn set_uid(&mut self, uid: u64) {
+        self.uid = uid;
+    }
+    fn get_class_type(&self) -> ClassType {
+        self.class_type
+    }
+    fn is_deleted(&self) -> bool {
+        self.delete
+    }
+    fn delete(&mut self) {
+        self.delete = true;
+    }
+    fn dirty(&self) -> bool {
+        self.dirty
+    }
+    fn clear_dirty(&mut self) {
+        self.dirty = false;
+    }
+    fn modify(&self) -> bool {
+        self.modify_attrs.len() > 0
+    }
+    fn clear_modify(&mut self) {
+        self.modify_attrs.clear();
+    }
+    fn get_modify<'a>(&'a self) -> &'a Vec<u32> {
+        &self.modify_attrs
+    }
+    fn get_attrs<'a>(&'a self) -> &'a Vec<&str> {
+        &self.attrs
+    }
+    fn save_attrs<'a>(&'a self) -> &'a Vec<&str> {
+        &self.saves
+    }
+    fn rep_attrs<'a>(&'a self) -> &'a Vec<&str> {
+        &self.reps
+    }
+    fn save_attrs_index(&self) -> &Vec<u32> {
+        &self.saves_index
+    }
+    fn rep_attrs_index(&self) -> &Vec<u32> {
+        &self.reps_index
+    }
+    fn get_attr_count(&self) -> u32 {
         self.attrs.len() as u32
     }
-    pub fn get_attr_index(&self, attr: &str) -> Option<u32> {
+    fn get_attr_index(&self, attr: &str) -> Option<u32> {
         match self.index.get(attr) {
             Some(&i) => Some(i),
             None => None,
         }
     }
-    pub fn get_attr_name<'a>(&'a self, index: u32) -> Option<&'a str> {
+    fn get_attr_name<'a>(&'a self, index: u32) -> Option<&'a str> {
         match self.attrs.get(index as usize) {
             Some(&attr) => Some(attr),
             None => None,
         }
     }
-    pub fn dirty(&self) -> bool {
-        self.dirty
-    }
-    pub fn clear_dirty(&mut self) {
-        self.dirty = false;
-    }
-    pub fn modify(&self) -> bool {
-        self.modify_attrs.len() > 0
-    }
-    pub fn get_modify<'a>(&'a self) -> &'a Vec<u32> {
-        &self.modify_attrs
-    }
-    pub fn clear_modify(&mut self) {
-        self.modify_attrs.clear();
-    }
-    pub fn change_attr(&mut self, index: u32, old: &dyn Any) {
+    fn change_attr(&mut self, index: u32, old: &dyn Any) {
         if self.saves_set.contains(&index) {
             self.dirty = true;
         }
@@ -129,11 +178,11 @@ impl EntityInfo {
 #[allow(dead_code)]
 pub struct ObjectInitializer {
     pub name: &'static str,
-    pub f: fn() -> Box<dyn Object>,
+    pub f: fn() -> ObjectPtr,
 }
 
 impl ObjectInitializer {
-    pub const fn register_entity(name: &'static str, f: fn() -> Box<dyn Object>) -> Self {
+    pub const fn register_entity(name: &'static str, f: fn() -> ObjectPtr) -> Self {
         Self { name, f }
     }
 }
@@ -141,12 +190,12 @@ impl ObjectInitializer {
 inventory::collect!(ObjectInitializer);
 
 pub struct Registry {
-    pub entity_map: HashMap<&'static str, fn() -> Box<dyn Object>>,
+    pub entity_map: HashMap<&'static str, fn() -> ObjectPtr>,
 }
 
 impl Registry {
     pub fn init() -> Self {
-        let mut map: HashMap<&'static str, fn() -> Box<dyn Object>> = HashMap::new();
+        let mut map: HashMap<&'static str, fn() -> ObjectPtr> = HashMap::new();
         for initializer in inventory::iter::<ObjectInitializer> {
             if map.contains_key(initializer.name) {
                 panic!("entity {} duplicate", initializer.name);
@@ -156,26 +205,10 @@ impl Registry {
         Self { entity_map: map }
     }
 
-    pub fn create_object(&self, entity: &str) -> Option<Box<dyn Object>> {
+    pub fn create_object(&self, entity: &str) -> Option<ObjectPtr> {
         match self.entity_map.get(entity) {
             Some(&f) => Some(f()),
             None => None,
         }
-    }
-
-    pub fn create_any(&self, entity: &str) -> Option<Box<dyn Any>> {
-        match self.entity_map.get(entity) {
-            Some(&f) => Some(f()),
-            None => None,
-        }
-    }
-
-    pub fn create<T: Object + Any>(&self, entity: &str) -> Option<Box<T>> {
-        if let Some(any_object) = self.create_any(entity) {
-            if let Ok(entity) = any_object.downcast::<T>() {
-                return Some(entity);
-            }
-        }
-        None
     }
 }

@@ -95,7 +95,7 @@ pub fn entity_builder(input: TokenStream) -> TokenStream {
         #entity_token
         #object_token
         inventory::submit! {
-            re_entity::entity::ObjectInitializer::register_entity(stringify!(#ident), || Box::new(#ident::new()))
+            re_entity::entity::ObjectInitializer::register_entity(stringify!(#ident), || std::rc::Rc::new(std::cell::RefCell::new(#ident::new())))
         }
     };
     output.into()

@@ -91,6 +91,9 @@ pub fn make_entity(
                 d.__internal.init(attrs, saves, reps);
                 d
             }
+            pub fn ClassName() -> &'static str {
+                stringify!(#ident)
+            }
             pub fn set_attr(&mut self, att: u32, v :&dyn std::any::Any) -> bool {
                 match att {
                     #(#match_any_set) *
@@ -105,52 +108,27 @@ pub fn make_entity(
             }
             #(#fn_attrs) *
         }
+
+        impl AsRef<dyn re_entity::entity::Entity> for #ident {
+            fn as_ref(&self) -> &(dyn re_entity::entity::Entity + 'static) {
+                &self.__internal
+            }
+        }
+
+        impl AsMut<dyn re_entity::entity::Entity> for #ident {
+            fn as_mut(&mut self) -> &mut (dyn re_entity::entity::Entity + 'static) {
+                &mut self.__internal
+            }
+        }
+
     }
 }
 
 pub fn make_object(ident: &Ident) -> TokenStream {
     quote! {
         use re_entity::entity::Object;
+        use re_entity::entity::Entity;
         impl Object for #ident {
-            fn uid(&self) -> u64 {
-                self.__internal.uid
-            }
-            fn get_class_type(&self) -> re_entity::entity::ClassType {
-                self.__internal.class_type
-            }
-            fn dirty(&self) -> bool {
-                self.__internal.dirty()
-            }
-            fn clear_dirty(&mut self) {
-                self.__internal.clear_dirty()
-            }
-            fn modify(&self) -> bool {
-                self.__internal.modify()
-            }
-            fn clear_modify(&mut self) {
-                self.__internal.clear_modify()
-            }
-            fn get_modify<'a>(&'a self) -> &'a Vec<u32> {
-                self.__internal.get_modify()
-            }
-            fn get_attrs<'a>(&'a self) -> &'a Vec<&str> {
-                &self.__internal.attrs
-            }
-            fn save_attrs<'a>(&'a self) -> &'a Vec<&str>{
-                &self.__internal.saves
-            }
-            fn rep_attrs<'a>(&'a self) -> &'a Vec<&str>{
-                &self.__internal.reps
-            }
-            fn save_attrs_index(&self) -> &Vec<u32> {
-                &self.__internal.saves_index
-            }
-            fn rep_attrs_index(&self) -> &Vec<u32> {
-                &self.__internal.reps_index
-            }
-            fn get_attr_count(&self) -> u32 {
-                self.__internal.attr_count()
-            }
             fn get_attr_by_name<'a>(&'a self, attr: &str) -> Option<&'a dyn std::any::Any> {
                 match self.__internal.get_attr_index(attr) {
                     Some(i) => self.get_attr_by_index(i),
@@ -163,17 +141,17 @@ pub fn make_object(ident: &Ident) -> TokenStream {
                     None=> false
                 }
             }
-            fn get_attr_name<'a>(&'a self, index: u32) -> Option<&'a str> {
-                self.__internal.get_attr_name(index)
-            }
-            fn get_attr_index(&self, attr: &str) -> Option<u32> {
-                self.__internal.get_attr_index(attr)
-            }
             fn get_attr_by_index<'a>(&'a self, index: u32) -> Option<&'a dyn std::any::Any> {
                 self.get_attr(index)
             }
             fn set_attr_by_index(&mut self, index: u32, val: &dyn std::any::Any) -> bool {
                 self.set_attr(index, val)
+            }
+            fn entity_ref<'a>(&'a self) -> &'a dyn Entity {
+                &self.__internal
+            }
+            fn entity_mut<'a>(&'a mut self) -> &'a mut dyn Entity{
+                &mut self.__internal
             }
         }
     }
