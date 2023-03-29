@@ -126,9 +126,7 @@ pub fn make_entity(
 
 pub fn make_object(ident: &Ident) -> TokenStream {
     quote! {
-        use re_entity::entity::Object;
-        use re_entity::entity::Entity;
-        impl Object for #ident {
+        impl re_entity::entity::Object for #ident {
             fn get_attr_by_name<'a>(&'a self, attr: &str) -> Option<&'a dyn std::any::Any> {
                 match self.__internal.get_attr_index(attr) {
                     Some(i) => self.get_attr_by_index(i),
@@ -147,10 +145,10 @@ pub fn make_object(ident: &Ident) -> TokenStream {
             fn set_attr_by_index(&mut self, index: u32, val: &dyn std::any::Any) -> bool {
                 self.set_attr(index, val)
             }
-            fn entity_ref<'a>(&'a self) -> &'a dyn Entity {
+            fn entity_ref<'a>(&'a self) -> &'a dyn re_entity::entity::Entity {
                 &self.__internal
             }
-            fn entity_mut<'a>(&'a mut self) -> &'a mut dyn Entity{
+            fn entity_mut<'a>(&'a mut self) -> &'a mut dyn re_entity::entity::Entity{
                 &mut self.__internal
             }
         }

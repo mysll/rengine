@@ -9,22 +9,27 @@ pub struct Factory {
     deletes: VecDeque<ObjectPtr>,
     used_size: usize,
     serial: usize,
+    owner: ObjectPtr,
 }
 
 impl Factory {
-    pub fn new() -> Self {
+    pub fn new(registry: Registry, owner: ObjectPtr) -> Self {
         let mut s = Self {
-            registry: Registry::init(),
+            registry: registry,
             objects: Vec::with_capacity(16),
             free_list: VecDeque::with_capacity(16),
             deletes: VecDeque::new(),
-            used_size: 0,
+            used_size: 1, // ignore 0
             serial: 0,
+            owner: owner,
         };
         s.objects.resize(16, None);
         s
     }
-
+    pub fn init(&mut self) {
+        self.objects[0] = Some(self.owner.clone());
+        self.owner.borrow_mut().entity_mut().set_uid(1 << 32);
+    }
     pub fn create(&mut self, ent: &str) -> Option<ObjectPtr> {
         let new_obj = self.registry.create_object(ent);
         if new_obj.is_none() {
@@ -81,7 +86,7 @@ impl Factory {
 
         match &self.objects[index] {
             Some(rcobj) => {
-                if rcobj.as_ref().borrow().entity_ref().uid() != id {
+                if rcobj.as_ptr() != obj_ptr.as_ptr() {
                     panic!("object not match");
                 }
             }
@@ -115,7 +120,7 @@ impl Factory {
 
             match &self.objects[index] {
                 Some(rcobj) => {
-                    if rcobj.as_ref().borrow().entity_ref().uid() != id {
+                    if rcobj.as_ptr() != obj_ptr.as_ptr() {
                         panic!("object not match");
                     }
                 }

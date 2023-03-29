@@ -2,7 +2,6 @@ use std::{
     any::Any,
     collections::{HashMap, HashSet},
     fmt::Debug,
-    rc::Rc,
 };
 
 use crate::{container::Container, ObjectPtr};
@@ -65,11 +64,11 @@ pub struct EntityInfo {
     pub reps_set: HashSet<u32>,
     pub dirty: bool,
     pub modify_attrs: Vec<u32>,
-    pub childs: Vec<Option<Rc<dyn Object>>>,
+    pub childs: Vec<Option<ObjectPtr>>,
     pub cap: usize,
     pub container_pos: usize,
     pub child_num: usize,
-    pub parent: Option<Rc<dyn Object>>,
+    pub parent: Option<ObjectPtr>,
 }
 
 impl Drop for EntityInfo {

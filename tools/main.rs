@@ -2,7 +2,7 @@ fn main() {}
 
 #[cfg(test)]
 mod test {
-    use std::{rc::Rc, cell::RefCell};
+    use std::{borrow::Borrow, cell::RefCell, rc::Rc};
 
     pub trait A {
         fn doa(&self);
@@ -64,21 +64,13 @@ mod test {
 
     #[test]
     fn test() {
-        let mut a = Test { a: A1 { val: 2 } };
-        let a1: &dyn A = a.as_ref();
-        a1.doa();
-        let a2: &dyn B = a.as_ref();
-        a2.dob();
-
-        let a3 = a.as_mut();
-        a3.doc();
-        let rc = Rc::new(RefCell::new(Test { a: A1 { val: 1 } }));
-        {
-            let rc1 = rc.clone();
-            let mut rc2 = rc1.borrow_mut();
-            rc2.a.val = 2;
-        }
-        let val = rc.as_ref().borrow();
-        println!("{:?} ", val.a.val);
+        let rc = Rc::new(RefCell::new(1));
+        let b = rc.clone();
+        let rc2 = Rc::new(RefCell::new(1));
+        let pt1 = rc.as_ptr();
+        let pt2 = b.as_ptr();
+        let pt3 = rc2.as_ptr();
+        println!("{}", pt1 == pt2);
+        println!("{}", pt1 == pt3);
     }
 }

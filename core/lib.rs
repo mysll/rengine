@@ -17,8 +17,12 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[cfg(test)]
 mod tests {
-    use re_entity::factory::Factory;
+    use re_entity::entity::Entity;
+    use re_entity::{entity::Registry, factory::Factory};
     use re_ops::def_entity;
+
+    #[def_entity]
+    struct TestScene {}
 
     #[def_entity]
     struct TestPlayer {
@@ -37,7 +41,10 @@ mod tests {
 
     #[test]
     fn test() {
-        let mut factory = Factory::new();
+        let registry = Registry::init();
+        let scene = registry.create_object(TestScene::ClassName()).unwrap();
+        let mut factory = Factory::new(registry, scene);
+        factory.init();
         let object = factory.create(TestPlayer::ClassName()).unwrap();
         {
             let player = object.borrow();
