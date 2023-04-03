@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 
 use crate::{entity::Registry, ObjectPtr};
 
+#[derive(Debug)]
 pub struct Factory {
     registry: Registry,
     objects: Vec<Option<ObjectPtr>>,
@@ -9,7 +10,15 @@ pub struct Factory {
     deletes: VecDeque<ObjectPtr>,
     used_size: usize,
     serial: usize,
+    
     owner: ObjectPtr,
+}
+
+impl Drop for Factory {
+    fn drop(&mut self) {
+        self.clear_deleted();
+        println!("factory destroyed");
+    }
 }
 
 impl Factory {
@@ -25,6 +34,9 @@ impl Factory {
         };
         s.objects.resize(16, None);
         s
+    }
+    pub fn get_owner(&self) -> ObjectPtr {
+        self.owner.clone()
     }
     pub fn init(&mut self) {
         self.objects[0] = Some(self.owner.clone());
@@ -146,6 +158,7 @@ impl Factory {
         }
     }
 
+    /// 查找对象
     pub fn find(&self, uid: u64) -> Option<ObjectPtr> {
         let index = (uid & 0x7FFFFFFF) as usize;
         if index > self.objects.len() {
