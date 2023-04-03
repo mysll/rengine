@@ -2,7 +2,7 @@ fn main() {}
 
 #[cfg(test)]
 mod test {
-    use std::{borrow::Borrow, cell::RefCell, rc::Rc};
+    use std::{cell::RefCell, rc::Rc};
 
     pub trait A {
         fn doa(&self);

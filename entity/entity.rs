@@ -1,10 +1,12 @@
 use std::{
     any::Any,
+    cell::RefCell,
     collections::{HashMap, HashSet},
     fmt::Debug,
+    rc::Rc,
 };
 
-use crate::{container::Container, ObjectPtr};
+use crate::{container::Container, factory::Factory, ObjectPtr, FactoryPtr};
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub enum ClassType {
     #[default]
@@ -27,6 +29,8 @@ pub trait Object: Debug + Any {
 }
 
 pub trait Entity: Container {
+    fn set_factory(&mut self, factory: FactoryPtr);
+    fn get_factory(&self) -> Option<FactoryPtr>;
     fn uid(&self) -> u64;
     fn set_uid(&mut self, uid: u64);
     fn get_class_type(&self) -> ClassType;
@@ -69,6 +73,7 @@ pub struct EntityInfo {
     pub container_pos: usize,
     pub child_num: usize,
     pub parent: Option<ObjectPtr>,
+    pub factory: Option<Rc<RefCell<Factory>>>,
 }
 
 impl Drop for EntityInfo {
@@ -103,9 +108,19 @@ impl EntityInfo {
 }
 
 impl Entity for EntityInfo {
+    fn set_factory(&mut self, factory: FactoryPtr) {
+        self.factory = Some(factory)
+    }
+    fn get_factory(&self) -> Option<FactoryPtr> {
+        match &self.factory {
+            Some(f) => Some(f.clone()),
+            None => None,
+        }
+    }
     fn uid(&self) -> u64 {
         self.uid
     }
+
     fn set_uid(&mut self, uid: u64) {
         self.uid = uid;
     }
@@ -188,6 +203,7 @@ impl ObjectInitializer {
 
 inventory::collect!(ObjectInitializer);
 
+#[derive(Debug)]
 pub struct Registry {
     pub entity_map: HashMap<&'static str, fn() -> ObjectPtr>,
 }

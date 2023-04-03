@@ -11,3 +11,4 @@ path = "lib.rs"
 
 [dependencies]
 inventory.workspace = true
+re_utils.workspace = true

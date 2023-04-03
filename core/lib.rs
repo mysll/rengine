@@ -17,6 +17,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
     use re_entity::entity::Entity;
     use re_entity::{entity::Registry, factory::Factory};
     use re_ops::def_entity;
@@ -43,22 +46,30 @@ mod tests {
     fn test() {
         let registry = Registry::init();
         let scene = registry.create_object(TestScene::ClassName()).unwrap();
-        let mut factory = Factory::new(registry, scene);
-        factory.init();
-        let object = factory.create(TestPlayer::ClassName()).unwrap();
+        let factory = Rc::new(RefCell::new(Factory::new(registry, scene.clone())));
+        scene.borrow_mut().entity_mut().set_factory(factory.clone());
+        factory.borrow_mut().init();
+        let object = factory
+            .borrow_mut()
+            .create(TestPlayer::ClassName())
+            .unwrap();
+
         {
             let player = object.borrow();
             let uid = player.entity_ref().uid();
             println!("{}", uid);
-            let new_obj = factory.find(uid);
+            let new_obj = factory.borrow_mut().find(uid);
             println!("{:?}", new_obj);
         }
-        factory.delete(object);
+        factory.borrow_mut().delete(object);
         println!("drop");
-        factory.clear_deleted();
+        factory.borrow_mut().clear_deleted();
 
-        let object = factory.create(TestPlayer::ClassName()).unwrap();
-        factory.destroy(object);
+        let object = factory
+            .borrow_mut()
+            .create(TestPlayer::ClassName())
+            .unwrap();
+        factory.borrow_mut().destroy(object);
         println!("after drop");
     }
 }
