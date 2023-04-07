@@ -21,10 +21,12 @@ pub enum ClassType {
     Container,
 }
 
-pub trait Entity: Container {
+pub trait GameEntity: Container {
     fn set_ptr(&mut self, self_ptr: ObjectPtr);
     fn set_factory(&mut self, factory: FactoryPtr);
     fn get_factory(&self) -> Option<Rc<RefCell<Factory>>>;
+    fn set_parent(&mut self, parent: ObjectPtr);
+    fn get_parent(&self) -> Option<ObjectPtr>;
     fn destroy_children(&mut self);
     fn destroy_child(&mut self, child: ObjectPtr);
     fn uid(&self) -> u64;
@@ -50,7 +52,7 @@ pub trait Entity: Container {
 
 #[allow(dead_code)]
 #[derive(Default, Debug)]
-pub struct EntityInfo {
+pub struct Entity {
     pub class_name: &'static str,
     pub uid: u64,
     pub class_type: ClassType,
@@ -76,13 +78,13 @@ pub struct EntityInfo {
     pub self_ptr: Option<WeakObjectPtr>,
 }
 
-impl Drop for EntityInfo {
+impl Drop for Entity {
     fn drop(&mut self) {
         debug!("drop entity {} uid {}", self.class_name, self.uid);
     }
 }
 
-impl EntityInfo {
+impl Entity {
     pub fn init(
         &mut self,
         class_name: &'static str,
@@ -110,7 +112,7 @@ impl EntityInfo {
     }
 }
 
-impl Entity for EntityInfo {
+impl GameEntity for Entity {
     fn set_ptr(&mut self, self_ptr: ObjectPtr) {
         self.self_ptr = Some(Rc::downgrade(&self_ptr));
     }
@@ -122,6 +124,19 @@ impl Entity for EntityInfo {
         if let Some(weak_factory) = &self.factory {
             if let Some(strong_factory) = weak_factory.upgrade() {
                 return Some(strong_factory);
+            }
+        }
+        None
+    }
+
+    fn set_parent(&mut self, child: ObjectPtr) {
+        self.parent = Some(Rc::downgrade(&child));
+    }
+    
+    fn get_parent(&self) -> Option<ObjectPtr> {
+        if let Some(parent) = &self.parent {
+            if let Some(pobj) = parent.upgrade() {
+                return Some(pobj);
             }
         }
         None

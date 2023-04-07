@@ -21,7 +21,7 @@ mod tests {
     use std::rc::Rc;
 
     use re_entity::container::Container;
-    use re_entity::entity::Entity;
+    use re_entity::entity::GameEntity;
     use re_entity::entity::Registry;
     use re_entity::object::GameObject;
     use re_entity::scene::GameScene;
@@ -79,7 +79,11 @@ mod tests {
             .entity_mut()
             .create_child(TestPlayer::ClassName(), 2)
             .unwrap();
-
+        {
+            let go = GameObject::new(obj2.clone());
+            let entity = go.get_entity();
+            println!("{}", entity.class_name);
+        }
         GameObject::destroy_self(obj2);
         scene.clear_all();
         let GameScene {

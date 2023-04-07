@@ -21,7 +21,7 @@ pub fn def_entity(args: TokenStream, input: TokenStream) -> TokenStream {
                 .parse2(quote! {#[attr()]none: ()})
                 .unwrap(),
         );
-        let add_attr = vec![quote! {__internal: re_entity::entity::EntityInfo}];
+        let add_attr = vec![quote! {__internal: re_entity::entity::Entity}];
         for att in add_attr {
             fields
                 .named

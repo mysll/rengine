@@ -3,7 +3,7 @@ use std::rc::Rc;
 use tracing::warn;
 
 use crate::{
-    entity::{ClassType, Entity, EntityInfo},
+    entity::{ClassType, GameEntity, Entity},
     ObjectPtr, WeakObjectPtr,
 };
 
@@ -14,9 +14,7 @@ pub trait Container {
     fn set_container_pos(&mut self, pos: usize);
     fn is_in_container(&self) -> bool;
     fn get_container_pos(&self) -> usize;
-    fn set_parent(&mut self, parent: ObjectPtr);
     fn set_weak_parent(&mut self, parent: WeakObjectPtr);
-    fn get_parent(&self) -> Option<ObjectPtr>;
     fn get_first_child(&self) -> (Option<ObjectPtr>, usize);
     fn get_next_child(&self, it: usize) -> (Option<ObjectPtr>, usize);
     fn get_child_id_list(&self, class_type: ClassType) -> Vec<u64>;
@@ -27,7 +25,7 @@ pub trait Container {
     fn find_child_container_free_index(&self) -> Option<usize>;
 }
 
-impl Container for EntityInfo {
+impl Container for Entity {
     fn capacity(&self) -> usize {
         self.cap
     }
@@ -56,15 +54,6 @@ impl Container for EntityInfo {
 
     fn get_container_pos(&self) -> usize {
         self.container_pos
-    }
-
-    fn get_parent(&self) -> Option<ObjectPtr> {
-        if let Some(parent) = &self.parent {
-            if let Some(pobj) = parent.upgrade() {
-                return Some(pobj);
-            }
-        }
-        None
     }
 
     fn get_first_child(&self) -> (Option<ObjectPtr>, usize) {
@@ -234,10 +223,6 @@ impl Container for EntityInfo {
 
     fn set_container_pos(&mut self, pos: usize) {
         self.container_pos = pos;
-    }
-
-    fn set_parent(&mut self, child: ObjectPtr) {
-        self.parent = Some(Rc::downgrade(&child));
     }
 
     fn set_weak_parent(&mut self, parent: WeakObjectPtr) {

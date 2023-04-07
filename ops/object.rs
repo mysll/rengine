@@ -109,14 +109,14 @@ pub fn make_entity(
             #(#fn_attrs) *
         }
 
-        impl AsRef<dyn re_entity::entity::Entity> for #ident {
-            fn as_ref(&self) -> &(dyn re_entity::entity::Entity + 'static) {
+        impl AsRef<re_entity::entity::Entity> for #ident {
+            fn as_ref(&self) -> &re_entity::entity::Entity {
                 &self.__internal
             }
         }
 
-        impl AsMut<dyn re_entity::entity::Entity> for #ident {
-            fn as_mut(&mut self) -> &mut (dyn re_entity::entity::Entity + 'static) {
+        impl AsMut<re_entity::entity::Entity> for #ident {
+            fn as_mut(&mut self) -> &mut re_entity::entity::Entity {
                 &mut self.__internal
             }
         }
@@ -145,10 +145,10 @@ pub fn make_object(ident: &Ident) -> TokenStream {
             fn set_attr_by_index(&mut self, index: u32, val: &dyn std::any::Any) -> bool {
                 self.set_attr(index, val)
             }
-            fn entity_ref<'a>(&'a self) -> &'a re_entity::entity::EntityInfo {
+            fn entity_ref<'a>(&'a self) -> &'a re_entity::entity::Entity {
                 &self.__internal
             }
-            fn entity_mut<'a>(&'a mut self) -> &'a mut re_entity::entity::EntityInfo{
+            fn entity_mut<'a>(&'a mut self) -> &'a mut re_entity::entity::Entity{
                 &mut self.__internal
             }
         }

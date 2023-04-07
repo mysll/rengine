@@ -3,7 +3,7 @@ use std::{collections::VecDeque, rc::Rc};
 use tracing::{debug, warn};
 
 use crate::{
-    entity::{Entity, Registry},
+    entity::{GameEntity, Registry},
     ObjectPtr,
 };
 

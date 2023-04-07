@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{entity::{Registry, Entity}, factory::Factory, ObjectPtr};
+use crate::{entity::{Registry, GameEntity}, factory::Factory, ObjectPtr};
 
 pub struct GameScene {
     pub scene_object: ObjectPtr,
