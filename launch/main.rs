@@ -1,7 +1,8 @@
 use clap::Parser;
 use re_core::{options::with_port, runtime};
+use time::macros::format_description;
 use tokio::signal;
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{fmt::time::LocalTime, EnvFilter, FmtSubscriber};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -11,7 +12,13 @@ struct Flags {
 }
 
 fn main() {
-    tracing_subscriber::registry().with(fmt::layer()).init();
+    let subscriber = FmtSubscriber::builder()
+        .with_env_filter(EnvFilter::new("debug"))
+        .with_timer(LocalTime::new(format_description!(
+            "[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:3]"
+        )))
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
     let args = Flags::parse();
     runtime::run(&[with_port(args.port)], signal::ctrl_c());
 }

@@ -1,28 +1,32 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, rc::Rc};
 
-use crate::{entity::Registry, ObjectPtr};
+use tracing::{debug, warn};
+
+use crate::{
+    entity::{Entity, Registry},
+    ObjectPtr,
+};
 
 #[derive(Debug)]
 pub struct Factory {
-    registry: Registry,
+    registry: Rc<Registry>,
     objects: Vec<Option<ObjectPtr>>,
     free_list: VecDeque<usize>,
     deletes: VecDeque<ObjectPtr>,
     used_size: usize,
     serial: usize,
-    
     owner: ObjectPtr,
 }
 
 impl Drop for Factory {
     fn drop(&mut self) {
         self.clear_deleted();
-        println!("factory destroyed");
+        debug!("factory destroyed");
     }
 }
 
 impl Factory {
-    pub fn new(registry: Registry, owner: ObjectPtr) -> Self {
+    pub fn new(registry: Rc<Registry>, owner: ObjectPtr) -> Self {
         let mut s = Self {
             registry: registry,
             objects: Vec::with_capacity(16),
@@ -35,13 +39,16 @@ impl Factory {
         s.objects.resize(16, None);
         s
     }
+
     pub fn get_owner(&self) -> ObjectPtr {
         self.owner.clone()
     }
+
     pub fn init(&mut self) {
         self.objects[0] = Some(self.owner.clone());
         self.owner.borrow_mut().entity_mut().set_uid(1 << 32);
     }
+
     pub fn create(&mut self, ent: &str) -> Option<ObjectPtr> {
         let new_obj = self.registry.create_object(ent);
         if new_obj.is_none() {
@@ -86,6 +93,7 @@ impl Factory {
             let object = obj_ptr.as_ref().borrow();
             let entity = object.entity_ref();
             if entity.is_deleted() {
+                warn!("already deleted");
                 return;
             }
             id = entity.uid();

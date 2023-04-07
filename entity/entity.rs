@@ -6,7 +6,9 @@ use std::{
     rc::Rc,
 };
 
-use crate::{container::Container, factory::Factory, ObjectPtr, FactoryPtr};
+use tracing::{debug, warn};
+
+use crate::{container::Container, factory::Factory, FactoryPtr, ObjectPtr, WeakObjectPtr};
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub enum ClassType {
     #[default]
@@ -19,18 +21,12 @@ pub enum ClassType {
     Container,
 }
 
-pub trait Object: Debug + Any {
-    fn entity_ref<'a>(&'a self) -> &'a dyn Entity;
-    fn entity_mut<'a>(&'a mut self) -> &'a mut dyn Entity;
-    fn get_attr_by_name<'a>(&'a self, attr: &str) -> Option<&'a dyn Any>;
-    fn set_attr_by_name(&mut self, attr: &str, val: &dyn Any) -> bool;
-    fn get_attr_by_index<'a>(&'a self, index: u32) -> Option<&'a dyn Any>;
-    fn set_attr_by_index(&mut self, index: u32, val: &dyn Any) -> bool;
-}
-
 pub trait Entity: Container {
+    fn set_ptr(&mut self, self_ptr: ObjectPtr);
     fn set_factory(&mut self, factory: FactoryPtr);
-    fn get_factory(&self) -> Option<FactoryPtr>;
+    fn get_factory(&self) -> Option<Rc<RefCell<Factory>>>;
+    fn destroy_children(&mut self);
+    fn destroy_child(&mut self, child: ObjectPtr);
     fn uid(&self) -> u64;
     fn set_uid(&mut self, uid: u64);
     fn get_class_type(&self) -> ClassType;
@@ -55,9 +51,11 @@ pub trait Entity: Container {
 #[allow(dead_code)]
 #[derive(Default, Debug)]
 pub struct EntityInfo {
+    pub class_name: &'static str,
     pub uid: u64,
     pub class_type: ClassType,
-    pub delete: bool,
+    pub deleted: bool,
+    pub destroying: bool,
     pub attrs: Vec<&'static str>,
     pub index: HashMap<&'static str, u32>,
     pub saves_index: Vec<u32>,
@@ -68,26 +66,31 @@ pub struct EntityInfo {
     pub reps_set: HashSet<u32>,
     pub dirty: bool,
     pub modify_attrs: Vec<u32>,
-    pub childs: Vec<Option<ObjectPtr>>,
+    pub children: Vec<Option<ObjectPtr>>,
     pub cap: usize,
     pub container_pos: usize,
     pub child_num: usize,
-    pub parent: Option<ObjectPtr>,
-    pub factory: Option<Rc<RefCell<Factory>>>,
+    pub parent: Option<WeakObjectPtr>,
+    pub factory: Option<FactoryPtr>,
+    // 方便获取自己的指针
+    pub self_ptr: Option<WeakObjectPtr>,
 }
 
 impl Drop for EntityInfo {
     fn drop(&mut self) {
-        println!("drop entity");
+        debug!("drop entity {} uid {}", self.class_name, self.uid);
     }
 }
+
 impl EntityInfo {
     pub fn init(
         &mut self,
+        class_name: &'static str,
         attrs: Vec<&'static str>,
         saves: Vec<&'static str>,
         reps: Vec<&'static str>,
     ) {
+        self.class_name = class_name;
         self.attrs = attrs;
         self.saves = saves;
         self.reps = reps;
@@ -108,15 +111,49 @@ impl EntityInfo {
 }
 
 impl Entity for EntityInfo {
+    fn set_ptr(&mut self, self_ptr: ObjectPtr) {
+        self.self_ptr = Some(Rc::downgrade(&self_ptr));
+    }
     fn set_factory(&mut self, factory: FactoryPtr) {
         self.factory = Some(factory)
     }
-    fn get_factory(&self) -> Option<FactoryPtr> {
-        match &self.factory {
-            Some(f) => Some(f.clone()),
-            None => None,
+
+    fn get_factory(&self) -> Option<Rc<RefCell<Factory>>> {
+        if let Some(weak_factory) = &self.factory {
+            if let Some(strong_factory) = weak_factory.upgrade() {
+                return Some(strong_factory);
+            }
+        }
+        None
+    }
+
+    fn destroy_child(&mut self, child: ObjectPtr) {
+        if child.borrow().entity_ref().destroying {
+            warn!("object already destroying");
+            return;
+        }
+        child.borrow_mut().entity_mut().destroying = true;
+        let in_container = child.borrow().entity_ref().is_in_container();
+        if in_container {
+            self.remove_child(child.clone());
+        }
+
+        child.borrow_mut().entity_mut().destroy_children();
+
+        if let Some(f) = self.get_factory() {
+            f.borrow_mut().delete(child);
         }
     }
+
+    fn destroy_children(&mut self) {
+        let children = self.children.len();
+        for i in 0..children {
+            if let Some(child) = &self.children[i] {
+                self.destroy_child(child.clone());
+            }
+        }
+    }
+
     fn uid(&self) -> u64 {
         self.uid
     }
@@ -124,60 +161,77 @@ impl Entity for EntityInfo {
     fn set_uid(&mut self, uid: u64) {
         self.uid = uid;
     }
+
     fn get_class_type(&self) -> ClassType {
         self.class_type
     }
+
     fn is_deleted(&self) -> bool {
-        self.delete
+        self.deleted
     }
+
     fn delete(&mut self) {
-        self.delete = true;
+        self.deleted = true;
     }
+
     fn dirty(&self) -> bool {
         self.dirty
     }
+
     fn clear_dirty(&mut self) {
         self.dirty = false;
     }
+
     fn modify(&self) -> bool {
         self.modify_attrs.len() > 0
     }
+
     fn clear_modify(&mut self) {
         self.modify_attrs.clear();
     }
+
     fn get_modify<'a>(&'a self) -> &'a Vec<u32> {
         &self.modify_attrs
     }
+
     fn get_attrs<'a>(&'a self) -> &'a Vec<&str> {
         &self.attrs
     }
+
     fn save_attrs<'a>(&'a self) -> &'a Vec<&str> {
         &self.saves
     }
+
     fn rep_attrs<'a>(&'a self) -> &'a Vec<&str> {
         &self.reps
     }
+
     fn save_attrs_index(&self) -> &Vec<u32> {
         &self.saves_index
     }
+
     fn rep_attrs_index(&self) -> &Vec<u32> {
         &self.reps_index
     }
+
     fn get_attr_count(&self) -> u32 {
         self.attrs.len() as u32
     }
+
     fn get_attr_index(&self, attr: &str) -> Option<u32> {
         match self.index.get(attr) {
             Some(&i) => Some(i),
             None => None,
         }
     }
+
     fn get_attr_name<'a>(&'a self, index: u32) -> Option<&'a str> {
         match self.attrs.get(index as usize) {
             Some(&attr) => Some(attr),
             None => None,
         }
     }
+
     fn change_attr(&mut self, index: u32, old: &dyn Any) {
         if self.saves_set.contains(&index) {
             self.dirty = true;
@@ -185,7 +239,7 @@ impl Entity for EntityInfo {
         if self.reps_set.contains(&index) {
             self.modify_attrs.push(index);
         }
-        print!("old:{:?}\n", old);
+        debug!("old:{:?}\n", old);
     }
 }
 
@@ -205,24 +259,47 @@ inventory::collect!(ObjectInitializer);
 
 #[derive(Debug)]
 pub struct Registry {
-    pub entity_map: HashMap<&'static str, fn() -> ObjectPtr>,
+    pub entity_vec: Vec<fn() -> ObjectPtr>,
+    pub entity_index: HashMap<&'static str, usize>,
 }
 
 impl Registry {
     pub fn init() -> Self {
-        let mut map: HashMap<&'static str, fn() -> ObjectPtr> = HashMap::new();
+        let mut index_map: HashMap<&'static str, usize> = HashMap::new();
+        let mut entity_vec = Vec::new();
         for initializer in inventory::iter::<ObjectInitializer> {
-            if map.contains_key(initializer.name) {
+            if index_map.contains_key(initializer.name) {
                 panic!("entity {} duplicate", initializer.name);
             }
-            map.insert(initializer.name, initializer.f);
+            let entity_idx = entity_vec.len();
+            entity_vec.push(initializer.f);
+            index_map.insert(initializer.name, entity_idx);
         }
-        Self { entity_map: map }
+        Self {
+            entity_vec: entity_vec,
+            entity_index: index_map,
+        }
+    }
+
+    pub fn get_class_index(&self, entity: &str) -> Option<usize> {
+        if let Some(&idx) = self.entity_index.get(entity) {
+            return Some(idx);
+        }
+        None
+    }
+
+    pub fn create_object_by_index(&self, idx: usize) -> Option<ObjectPtr> {
+        if idx >= self.entity_vec.len() {
+            return None;
+        }
+        let new_obj = self.entity_vec[idx]();
+        new_obj.borrow_mut().entity_mut().set_ptr(new_obj.clone());
+        Some(new_obj)
     }
 
     pub fn create_object(&self, entity: &str) -> Option<ObjectPtr> {
-        match self.entity_map.get(entity) {
-            Some(&f) => Some(f()),
+        match self.entity_index.get(entity) {
+            Some(&idx) => self.create_object_by_index(idx),
             None => None,
         }
     }

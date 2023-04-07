@@ -11,13 +11,18 @@ repository = "https://github.com/mysll/rengine"
 re_ops = { path = "./ops" }
 re_core = { path = "./core" }
 re_utils = { path = "./utils" }
-re_entity = {path = "./entity"}
+re_entity = { path = "./entity" }
 rand = "0.8.5"
 tokio = { version = "=1.25.0", features = ["full"] }
 tokio-util = "0.7.7"
 tracing = "0.1.34"
 tracing-futures = { version = "0.2.3" }
-tracing-subscriber = { version = "0.3.11", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.11", features = [
+    "env-filter",
+    "time",
+    "local-time",
+] }
+time = { version = "0.3.20", features = ["formatting", "macros"] }
 clap = { version = "4.1.8", features = ["derive"] }
 bytes = "1.4.0"
 syn = { version = "1.0.109", features = ["full", "extra-traits"] }

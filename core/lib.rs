@@ -17,12 +17,20 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
+
     use std::rc::Rc;
 
+    use re_entity::container::Container;
     use re_entity::entity::Entity;
-    use re_entity::{entity::Registry, factory::Factory};
+    use re_entity::entity::Registry;
+    use re_entity::object::GameObject;
+    use re_entity::scene::GameScene;
     use re_ops::def_entity;
+    use time::macros::format_description;
+    use tracing::info;
+    use tracing_subscriber::fmt::time::LocalTime;
+    use tracing_subscriber::EnvFilter;
+    use tracing_subscriber::FmtSubscriber;
 
     #[def_entity]
     struct TestScene {}
@@ -36,40 +44,50 @@ mod tests {
         age: i32,
     }
 
-    impl Drop for TestPlayer {
-        fn drop(&mut self) {
-            println!("Dropping!");
-        }
-    }
-
     #[test]
     fn test() {
-        let registry = Registry::init();
-        let scene = registry.create_object(TestScene::ClassName()).unwrap();
-        let factory = Rc::new(RefCell::new(Factory::new(registry, scene.clone())));
-        scene.borrow_mut().entity_mut().set_factory(factory.clone());
-        factory.borrow_mut().init();
-        let object = factory
-            .borrow_mut()
-            .create(TestPlayer::ClassName())
-            .unwrap();
+        let subscriber = FmtSubscriber::builder()
+            .with_env_filter(EnvFilter::new("debug"))
+            .with_timer(LocalTime::new(format_description!(
+                "[hour]:[minute]:[second].[subsecond digits:3]"
+            )))
+            .finish();
 
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("setting default subscriber failed");
+
+        let registry = Rc::new(Registry::init());
+        let scene = GameScene::new(TestScene::ClassName(), registry.clone()).unwrap();
         {
+            let object = scene
+                .scene_object
+                .borrow_mut()
+                .entity_mut()
+                .create_child(TestPlayer::ClassName(), 1)
+                .unwrap();
+
             let player = object.borrow();
             let uid = player.entity_ref().uid();
-            println!("{}", uid);
-            let new_obj = factory.borrow_mut().find(uid);
-            println!("{:?}", new_obj);
+            info!("{}", uid);
+            let new_obj = scene.factory.borrow_mut().find(uid);
+            info!("{:?}", new_obj);
         }
-        factory.borrow_mut().delete(object);
-        println!("drop");
-        factory.borrow_mut().clear_deleted();
 
-        let object = factory
+        let obj2 = scene
+            .scene_object
             .borrow_mut()
-            .create(TestPlayer::ClassName())
+            .entity_mut()
+            .create_child(TestPlayer::ClassName(), 2)
             .unwrap();
-        factory.borrow_mut().destroy(object);
-        println!("after drop");
+
+        GameObject::destroy_self(obj2);
+        scene.clear_all();
+        let GameScene {
+            scene_object,
+            factory,
+        } = scene;
+
+        drop(scene_object);
+        drop(factory);
     }
 }
