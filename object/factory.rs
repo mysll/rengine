@@ -1,11 +1,8 @@
-use std::{collections::VecDeque, rc::Rc};
+use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
 use tracing::{debug, warn};
 
-use crate::{
-    entity::{GameEntity, Registry},
-    ObjectPtr,
-};
+use crate::{game_object::GameObject, object::Object, registry::Registry, ObjectPtr};
 
 #[derive(Debug)]
 pub struct Factory {
@@ -46,13 +43,19 @@ impl Factory {
 
     pub fn init(&mut self) {
         self.objects[0] = Some(self.owner.clone());
-        self.owner.borrow_mut().entity_mut().set_uid(1 << 32);
+        self.owner.borrow_mut().set_uid(1 << 32);
     }
 
-    pub fn create(&mut self, ent: &str) -> Option<ObjectPtr> {
-        let new_obj = self.registry.create_object(ent);
-        if new_obj.is_none() {
+    pub fn create(&mut self, ent: &str, cap: usize) -> Option<ObjectPtr> {
+        let new_data = self.registry.create_object(ent);
+        if new_data.is_none() {
             return None;
+        }
+        let new_obj;
+        if cap == 0 {
+            new_obj = Rc::new(RefCell::new(Object::new(new_data.unwrap())));
+        } else {
+            new_obj = Rc::new(RefCell::new(Object::new_with_cap(new_data.unwrap(), cap)));
         }
         let index;
         if self.free_list.len() == 0 {
@@ -75,11 +78,11 @@ impl Factory {
         }
         let mut id = (self.serial << 32) as u64;
         id += index as u64;
-        let new_obj = new_obj.unwrap();
-        {
-            let mut obj = new_obj.borrow_mut();
-            obj.entity_mut().set_uid(id);
-        }
+
+        Object::object_map_mut(&new_obj, |obj| {
+            obj.set_ptr(&new_obj);
+            obj.set_uid(id);
+        });
         let ret = new_obj.clone();
         self.objects[index] = Some(new_obj);
         Some(ret)
@@ -87,11 +90,10 @@ impl Factory {
 
     /// 立即销毁一个对象
     /// 从工厂移除，立即drop
-    pub fn destroy(&mut self, obj_ptr: ObjectPtr) {
+    pub fn destroy(&mut self, obj_ptr: &ObjectPtr) {
         let id: u64;
         {
-            let object = obj_ptr.as_ref().borrow();
-            let entity = object.entity_ref();
+            let entity = obj_ptr.borrow();
             if entity.is_deleted() {
                 warn!("already deleted");
                 return;
@@ -114,19 +116,18 @@ impl Factory {
                 panic!("object is null");
             }
         }
-        obj_ptr.borrow_mut().entity_mut().delete();
+        obj_ptr.borrow_mut().delete();
         self.objects[index] = None;
         self.free_list.push_back(index);
     }
 
     /// 设置删除标志
     /// 从工厂移除，延迟drop
-    pub fn delete(&mut self, obj_ptr: ObjectPtr) {
+    pub fn delete(&mut self, obj_ptr: &ObjectPtr) {
         {
             let id: u64;
             {
-                let object = obj_ptr.as_ref().borrow();
-                let entity = object.entity_ref();
+                let entity = obj_ptr.borrow();
                 if entity.is_deleted() {
                     return;
                 }
@@ -148,11 +149,11 @@ impl Factory {
                     panic!("object is null");
                 }
             }
-            obj_ptr.borrow_mut().entity_mut().delete();
+            obj_ptr.borrow_mut().delete();
             self.objects[index] = None;
             self.free_list.push_back(index);
         }
-        self.deletes.push_back(obj_ptr);
+        self.deletes.push_back(obj_ptr.clone());
     }
 
     /// 立即销毁标志为删除的对象
@@ -175,7 +176,7 @@ impl Factory {
 
         match &self.objects[index] {
             Some(rcobj) => {
-                if rcobj.borrow().entity_ref().uid() == uid {
+                if rcobj.borrow().uid == uid {
                     let obj = rcobj.clone();
                     Some(obj)
                 } else {

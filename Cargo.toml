@@ -1,5 +1,5 @@
 [workspace]
-members = ["utils", "tools", "core", "launch", "entity", "ops"]
+members = ["utils", "tools", "core", "launch", "ops", "object"]
 
 [workspace.package]
 authors = ["the rengine authors"]
@@ -11,7 +11,8 @@ repository = "https://github.com/mysll/rengine"
 re_ops = { path = "./ops" }
 re_core = { path = "./core" }
 re_utils = { path = "./utils" }
-re_entity = { path = "./entity" }
+re_object = { path = "./object" }
+
 rand = "0.8.5"
 tokio = { version = "=1.25.0", features = ["full"] }
 tokio-util = "0.7.7"

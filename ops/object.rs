@@ -12,6 +12,8 @@ pub fn parse_token(
     rep_attrs: &mut Vec<Ident>,
     match_any_set: &mut Vec<TokenStream>,
     match_any_get: &mut Vec<TokenStream>,
+    match_attr_set: &mut Vec<TokenStream>,
+    match_attr_get: &mut Vec<TokenStream>,
 ) -> Ident {
     let DeriveInput { ident, .. } = ast;
     if let syn::Data::Struct(syn::DataStruct { fields, .. }) = ast.data {
@@ -33,7 +35,7 @@ pub fn parse_token(
                             return;
                         }
                         let old = std::mem::replace(&mut self.#ident_field, val);
-                        self.__internal.change_attr(#index, &old);
+                        self.change_attr(#index, &old);
                     }
                     pub fn #set_any(&mut self, val:&dyn std::any::Any) -> bool {
                         match val.downcast_ref::<#ty>() {
@@ -65,6 +67,16 @@ pub fn parse_token(
                         Some(self.#get())
                     }
                 });
+                match_attr_set.push(quote! {
+                    stringify!(#ident_field) => {
+                        self.#set_any(v)
+                    }
+                });
+                match_attr_get.push(quote! {
+                    stringify!(#ident_field) => {
+                        Some(self.#get())
+                    }
+                });
                 index += 1;
             }
         }
@@ -80,35 +92,54 @@ pub fn make_entity(
     rep_attrs: &Vec<Ident>,
     match_any_set: &Vec<TokenStream>,
     match_any_get: &Vec<TokenStream>,
+    match_attr_set: &mut Vec<TokenStream>,
+    match_attr_get: &mut Vec<TokenStream>,
 ) -> TokenStream {
     quote! {
         impl #ident {
             pub fn new() -> Self {
                 let mut d = Self::default();
-                let attrs = vec![ #(stringify!(#attrs)),* ];
-                let saves = vec![ #(stringify!(#save_attrs)),* ];
-                let reps = vec![ #(stringify!(#rep_attrs)),* ];
-                d.__internal.init(stringify!(#ident), attrs, saves, reps);
+                let attrs:Vec<&'static str>= vec![ #(stringify!(#attrs)),* ];
+                let saves:Vec<&'static str> = vec![ #(stringify!(#save_attrs)),* ];
+                let reps:Vec<&'static str> = vec![ #(stringify!(#rep_attrs)),* ];
+                d.__model = re_object::game_model::Model::new(stringify!(#ident), attrs, saves, reps);
                 d
             }
             pub fn ClassName() -> &'static str {
                 stringify!(#ident)
             }
-            pub fn set_attr(&mut self, att: u32, v :&dyn std::any::Any) -> bool {
+            pub fn change_attr(&mut self, index:u32, old:&dyn std::any::Any) {
+                unsafe{
+                    (*self.__go.0).change_attr(index, old);
+                }
+            }
+            pub fn set_attr_by_index(&mut self, att: u32, v :&dyn std::any::Any) -> bool {
                 match att {
                     #(#match_any_set) *
                     _ => false
                 }
             }
-            pub fn get_attr<'a>(&'a self, att: u32) ->Option<&'a dyn std::any::Any> {
+            pub fn get_attr_by_index<'a>(&'a self, att: u32) ->Option<&'a dyn std::any::Any> {
                 match att {
                     #(#match_any_get) *
                     _ => None
                 }
             }
+            pub fn set_attr(&mut self, att: &str, v :&dyn std::any::Any) -> bool {
+                match att {
+                    #(#match_attr_set) *
+                    _ => false
+                }
+            }
+            pub fn get_attr<'a>(&'a self, att: &str) ->Option<&'a dyn std::any::Any> {
+                match att {
+                    #(#match_attr_get) *
+                    _ => None
+                }
+            }
             #(#fn_attrs) *
         }
-
+        /*
         impl AsRef<re_entity::entity::Entity> for #ident {
             fn as_ref(&self) -> &re_entity::entity::Entity {
                 &self.__internal
@@ -120,36 +151,37 @@ pub fn make_entity(
                 &mut self.__internal
             }
         }
+        */
 
     }
 }
 
 pub fn make_object(ident: &Ident) -> TokenStream {
     quote! {
-        impl re_entity::object::Object for #ident {
+        impl re_object::game_model::GameModel for #ident {
+            fn get_model(&self) -> re_object::game_model::Model {
+                self.__model.clone()
+            }
+            fn set_gameobj(&mut self, go: *mut re_object::object::Object){
+                self.__go=re_object::MutObjectPtr(go);
+            }
             fn get_attr_by_name<'a>(&'a self, attr: &str) -> Option<&'a dyn std::any::Any> {
-                match self.__internal.get_attr_index(attr) {
-                    Some(i) => self.get_attr_by_index(i),
-                    None=> None
-                }
+                self.get_attr(attr)
             }
             fn set_attr_by_name(&mut self, attr: &str, val: &dyn std::any::Any) -> bool {
-                match self.__internal.get_attr_index(attr) {
-                    Some(i) => self.set_attr_by_index(i, val),
-                    None=> false
-                }
+                self.set_attr(attr, val)
             }
             fn get_attr_by_index<'a>(&'a self, index: u32) -> Option<&'a dyn std::any::Any> {
-                self.get_attr(index)
+                self.get_attr_by_index(index)
             }
             fn set_attr_by_index(&mut self, index: u32, val: &dyn std::any::Any) -> bool {
-                self.set_attr(index, val)
+                self.set_attr_by_index(index, val)
             }
-            fn entity_ref<'a>(&'a self) -> &'a re_entity::entity::Entity {
-                &self.__internal
+            fn get_any<'a>(&'a self) -> &'a dyn std::any::Any {
+                self
             }
-            fn entity_mut<'a>(&'a mut self) -> &'a mut re_entity::entity::Entity{
-                &mut self.__internal
+            fn get_mut_any<'a>(&'a mut self) -> &'a mut dyn std::any::Any {
+                self
             }
         }
     }

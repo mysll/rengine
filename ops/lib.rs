@@ -21,7 +21,11 @@ pub fn def_entity(args: TokenStream, input: TokenStream) -> TokenStream {
                 .parse2(quote! {#[attr()]none: ()})
                 .unwrap(),
         );
-        let add_attr = vec![quote! {__internal: re_entity::entity::Entity}];
+        let add_attr = vec![
+            quote! {__model: re_object::game_model::Model},
+            quote! {__go: re_object::MutObjectPtr},
+        ];
+        //let add_attr: Vec<proc_macro2::TokenStream> = Vec::new();
         for att in add_attr {
             fields
                 .named
@@ -36,30 +40,6 @@ pub fn def_entity(args: TokenStream, input: TokenStream) -> TokenStream {
     .into();
 }
 
-#[proc_macro_derive(NumEnum)]
-pub fn num_enum_builder(input: TokenStream) -> TokenStream {
-    let ast: DeriveInput = parse_macro_input!(input);
-    let DeriveInput { ident, .. } = ast;
-    let mut enums = Vec::new();
-    if let syn::Data::Enum(syn::DataEnum { variants, .. }) = ast.data {
-        for variant in variants {
-            let enum_ident = variant.ident;
-            enums.push(enum_ident);
-        }
-    };
-    let output = quote! {
-        impl #ident {
-            pub fn get_attr_enum_by_index(i:u32) -> Option<Self> {
-                match i {
-                    #(x if x == Self::#enums as u32 => Some(Self::#enums),) *
-                    _ => None,
-                }
-            }
-        }
-    };
-    output.into()
-}
-
 #[proc_macro_derive(Entity, attributes(attr))]
 pub fn entity_builder(input: TokenStream) -> TokenStream {
     let ast: DeriveInput = parse_macro_input!(input);
@@ -69,6 +49,8 @@ pub fn entity_builder(input: TokenStream) -> TokenStream {
     let mut rep_attrs: Vec<Ident> = Vec::new();
     let mut match_any_set: Vec<proc_macro2::TokenStream> = Vec::new();
     let mut match_any_get: Vec<proc_macro2::TokenStream> = Vec::new();
+    let mut match_attr_set: Vec<proc_macro2::TokenStream> = Vec::new();
+    let mut match_attr_get: Vec<proc_macro2::TokenStream> = Vec::new();
 
     let ident = object::parse_token(
         ast,
@@ -78,6 +60,8 @@ pub fn entity_builder(input: TokenStream) -> TokenStream {
         &mut rep_attrs,
         &mut match_any_set,
         &mut match_any_get,
+        &mut match_attr_set,
+        &mut match_attr_get,
     );
 
     let entity_token = object::make_entity(
@@ -88,6 +72,8 @@ pub fn entity_builder(input: TokenStream) -> TokenStream {
         &rep_attrs,
         &match_any_set,
         &match_any_get,
+        &mut match_attr_set,
+        &mut match_attr_get,
     );
     let object_token = object::make_object(&ident);
 
@@ -95,7 +81,7 @@ pub fn entity_builder(input: TokenStream) -> TokenStream {
         #entity_token
         #object_token
         inventory::submit! {
-            re_entity::entity::ObjectInitializer::register_entity(stringify!(#ident), || std::rc::Rc::new(std::cell::RefCell::new(#ident::new())))
+            re_object::registry::ObjectInitializer::register_entity(stringify!(#ident), || std::rc::Rc::new(std::cell::RefCell::new(#ident::new())))
         }
     };
     output.into()

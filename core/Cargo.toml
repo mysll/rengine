@@ -11,8 +11,7 @@ path = "lib.rs"
 [dependencies]
 re_utils.workspace = true
 re_ops.workspace = true
-re_entity.workspace = true
-
+re_object.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true

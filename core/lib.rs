@@ -1,5 +1,4 @@
 mod connection;
-mod entity;
 mod package;
 
 pub const MAX_LEN: usize = 64 * 1024;
@@ -17,23 +16,20 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[cfg(test)]
 mod tests {
-
     use std::rc::Rc;
 
-    use re_entity::container::Container;
-    use re_entity::entity::GameEntity;
-    use re_entity::entity::Registry;
-    use re_entity::object::GameObject;
-    use re_entity::scene::GameScene;
+    use re_object::{
+        game_object::GameObject, game_scene::GameScene, object::Object, registry::Registry,
+    };
     use re_ops::def_entity;
     use time::macros::format_description;
-    use tracing::info;
-    use tracing_subscriber::fmt::time::LocalTime;
-    use tracing_subscriber::EnvFilter;
-    use tracing_subscriber::FmtSubscriber;
+    use tracing_subscriber::{fmt::time::LocalTime, EnvFilter, FmtSubscriber};
 
     #[def_entity]
-    struct TestScene {}
+    struct TestScene {
+        #[attr()]
+        name: &'static str,
+    }
 
     #[def_entity]
     struct TestPlayer {
@@ -42,6 +38,18 @@ mod tests {
         name: String,
         #[attr(replicated)]
         age: i32,
+    }
+
+    #[def_entity]
+    struct TestBox {
+        #[attr(save, replicated)]
+        name: String,
+    }
+
+    #[def_entity]
+    struct TestItem {
+        #[attr(save, replicated)]
+        name: String,
     }
 
     #[test]
@@ -57,34 +65,23 @@ mod tests {
             .expect("setting default subscriber failed");
 
         let registry = Rc::new(Registry::init());
+
         let scene = GameScene::new(TestScene::ClassName(), registry.clone()).unwrap();
+        Object::model_map(&scene.scene_object, |scene: &TestScene| {
+            println!("{:?}", scene.__go.0);
+        });
+        Object::model_map_mut(&scene.scene_object, |scene: &mut TestScene| {
+            scene.set_name("test");
+            println!("{:?}", scene.name);
+        });
         {
-            let object = scene
-                .scene_object
-                .borrow_mut()
-                .entity_mut()
-                .create_child(TestPlayer::ClassName(), 1)
-                .unwrap();
-
-            let player = object.borrow();
-            let uid = player.entity_ref().uid();
-            info!("{}", uid);
-            let new_obj = scene.factory.borrow_mut().find(uid);
-            info!("{:?}", new_obj);
+            let player = scene.create_in_scene(TestPlayer::ClassName(), 0).unwrap();
+            println!("{:?}", player);
+            let item_box = Object::create(&player, TestBox::ClassName(), 1, 0).unwrap();
+            Object::create(&item_box, TestItem::ClassName(), 0, 0);
+            Object::create(&item_box, TestItem::ClassName(), 0, 0);
         }
 
-        let obj2 = scene
-            .scene_object
-            .borrow_mut()
-            .entity_mut()
-            .create_child(TestPlayer::ClassName(), 2)
-            .unwrap();
-        {
-            let go = GameObject::new(obj2.clone());
-            let entity = go.get_entity();
-            println!("{}", entity.class_name);
-        }
-        GameObject::destroy_self(obj2);
         scene.clear_all();
         let GameScene {
             scene_object,

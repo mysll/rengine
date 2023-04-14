@@ -3,7 +3,8 @@ use std::rc::Rc;
 use tracing::warn;
 
 use crate::{
-    entity::{ClassType, GameEntity, Entity},
+    game_object::GameObject,
+    object::{ClassType, Object},
     ObjectPtr, WeakObjectPtr,
 };
 
@@ -18,14 +19,14 @@ pub trait Container {
     fn get_first_child(&self) -> (Option<ObjectPtr>, usize);
     fn get_next_child(&self, it: usize) -> (Option<ObjectPtr>, usize);
     fn get_child_id_list(&self, class_type: ClassType) -> Vec<u64>;
-    fn create_child(&mut self, entity: &str, pos: usize) -> Option<ObjectPtr>;
+    fn create_child(&mut self, entity: &str, cap: usize, pos: usize) -> Option<ObjectPtr>;
     fn add_child(&mut self, child: ObjectPtr, pos: usize) -> bool;
-    fn remove_child(&mut self, child: ObjectPtr) -> bool;
+    fn remove_child(&mut self, child: &ObjectPtr) -> bool;
     fn remove_child_by_index(&mut self, index: usize) -> bool;
     fn find_child_container_free_index(&self) -> Option<usize>;
 }
 
-impl Container for Entity {
+impl Container for Object {
     fn capacity(&self) -> usize {
         self.cap
     }
@@ -85,10 +86,10 @@ impl Container for Entity {
         for i in 0..self.children.len() {
             if let Some(obj) = self.children.get(i).unwrap() {
                 match class_type {
-                    ClassType::None => result.push(obj.as_ref().borrow().entity_ref().uid()),
+                    ClassType::None => result.push(obj.as_ref().borrow().uid),
                     _ => {
-                        if obj.as_ref().borrow().entity_ref().get_class_type() == class_type {
-                            result.push(obj.as_ref().borrow().entity_ref().uid());
+                        if obj.as_ref().borrow().class_type == class_type {
+                            result.push(obj.as_ref().borrow().uid);
                         }
                     }
                 }
@@ -97,14 +98,17 @@ impl Container for Entity {
         result
     }
 
-    fn create_child(&mut self, entity: &str, pos: usize) -> Option<ObjectPtr> {
-        if let Some(factory) = self.get_factory() {
-            let mut factory = factory.borrow_mut();
-            if let Some(new_object) = factory.create(entity) {
+    fn create_child(&mut self, entity: &str, cap: usize, pos: usize) -> Option<ObjectPtr> {
+        assert!(self.get_factory().is_some());
+        if let Some(factory_ptr) = self.get_factory() {
+            let mut factory = factory_ptr.borrow_mut();
+            if let Some(new_object) = factory.create(entity, cap) {
                 if !self.add_child(new_object.clone(), pos) {
-                    factory.destroy(new_object);
+                    factory.destroy(&new_object);
                     return None;
                 }
+                new_object.borrow_mut().set_factory(&factory_ptr);
+                Object::created(&new_object);
                 return Some(new_object.clone());
             }
         }
@@ -113,11 +117,11 @@ impl Container for Entity {
     }
 
     fn add_child(&mut self, child: ObjectPtr, pos: usize) -> bool {
-        if child.borrow().entity_ref().is_deleted() {
+        if child.borrow().is_deleted() {
             warn!("object is delete");
             return false;
         }
-        assert!(!child.borrow().entity_ref().is_in_container());
+        assert!(!child.borrow().is_in_container());
         if self.cap > 0 && self.child_num >= self.cap {
             return false;
         }
@@ -153,8 +157,7 @@ impl Container for Entity {
         self.child_num += 1;
 
         {
-            let mut mut_entity = child.borrow_mut();
-            let entity = mut_entity.entity_mut();
+            let mut entity = child.borrow_mut();
             entity.set_container_pos(real_pos);
             if let Some(ptr) = &self.self_ptr {
                 entity.set_weak_parent(ptr.clone());
@@ -164,9 +167,9 @@ impl Container for Entity {
         true
     }
 
-    fn remove_child(&mut self, child: ObjectPtr) -> bool {
-        assert!(child.borrow().entity_ref().is_in_container());
-        let index = child.borrow().entity_ref().get_container_pos() - 1;
+    fn remove_child(&mut self, child: &ObjectPtr) -> bool {
+        assert!(child.borrow().is_in_container());
+        let index = child.borrow().get_container_pos() - 1;
         assert!(index < self.children.len());
         if index >= self.children.len() {
             return false;
@@ -202,7 +205,7 @@ impl Container for Entity {
         {
             let child = child.unwrap();
             let mut mut_child = child.borrow_mut();
-            mut_child.entity_mut().set_container_pos(0);
+            mut_child.set_container_pos(0);
         }
         self.dirty = true;
         true
